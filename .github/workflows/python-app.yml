@@ -1,111 +1,159 @@
-name: CI Workflow with Groups
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./example-app
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: |
-          cd example-app/
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH=$PATH:$HOME/.local/bin
-          poetry debug info
-          poetry install --no-root
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Install Poetry Action
+      uses: snok/install-poetry@v1.3.4
+      
+    - name: Install deps
+      run: poetry install --no-root
+      
+    - name: Cache build venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/work/iac-labs/iac-labs/example-app/.venv
+        key: ${{ runner.os }}-venv
 
   lint:
     runs-on: ubuntu-latest
-    needs: build  # Ensure this runs after group1 job
-    if: github.event_name == 'push'  # Run only on push events
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./example-app
+    needs: build
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: |
-          cd example-app/
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH=$PATH:$HOME/.local/bin
-          poetry debug info
-          poetry install --no-root
-          poetry run task test
-
-  formattert:
-    runs-on: ubuntu-latest
-    needs: build  # Ensure this runs after group1 job
-    if: github.event_name == 'push'  # Run only on push events
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: |
-          cd example-app/
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH=$PATH:$HOME/.local/bin
-          poetry debug info
-          poetry install --no-root
-          poetry run task formatter
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Install Poetry Action
+      uses: snok/install-poetry@v1.3.4
+    - name: Recover cached deps
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/work/iac-labs/iac-labs/example-app/.venv
+        key: ${{ runner.os }}-venv
         
-  security:
-    runs-on: ubuntu-latest
-    needs: build  # Ensure this runs after group1 job
-    if: github.event_name == 'push'  # Run only on push events
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Lint 
+      run: | 
+        poetry run task lint
 
-      - name: Set up Python 3.13
+  formatter:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./example-app
+    needs: build
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Install Poetry Action
+      uses: snok/install-poetry@v1.3.4
+    - name: Recover cached deps
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/work/iac-labs/iac-labs/example-app/.venv
+        key: ${{ runner.os }}-venv
+          
+    - name: Formatter
+      run: |
+        poetry run task formatter
+
+  secTest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./example-app
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
-          python-version: "3.13"
-      - name: Install dependencies
+          python-version: "3.11"
+      - name: Install Poetry Action
+        uses: snok/install-poetry@v1.3.4
+      - name: Recover cached deps
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/work/iac-labs/iac-labs/example-app/.venv
+          key: ${{ runner.os }}-venv
+        
+      - name: Sec Test
         run: |
-          cd example-app/
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH=$PATH:$HOME/.local/bin
-          poetry debug info
-          poetry install --no-root
           poetry run task security
-  unittest:
-    runs-on: ubuntu-latest
-    needs: [lint, formattert, security]   # Ensure this runs after group1 job
-    if: github.event_name == 'push'  # Run only on push events
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: Set up Python 3.13
+  test: 
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./example-app
+    needs: [lint, formatter, secTest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
-          python-version: "3.13"
-      - name: Install dependencies
+          python-version: "3.11"
+      - name: Install Poetry Action
+        uses: snok/install-poetry@v1.3.4
+      - name: Recover cached deps
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/work/iac-labs/iac-labs/example-app/.venv
+          key: ${{ runner.os }}-venv
+        
+      - name: Test
         run: |
-          cd example-app/
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH=$PATH:$HOME/.local/bin
-          poetry debug info
-          poetry install --no-root
-          poetry run task security
+          poetry run task test
