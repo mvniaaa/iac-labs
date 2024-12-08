@@ -89,7 +89,7 @@ jobs:
           poetry debug info
           poetry install --no-root
           poetry run task security
-  test:
+  unittest:
     runs-on: ubuntu-latest
     needs: [lint, formattert, security]   # Ensure this runs after group1 job
     if: github.event_name == 'push'  # Run only on push events
